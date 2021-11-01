@@ -1,0 +1,113 @@
+version: '3.8'
+x-airflow-common:
+  &airflow-common
+  image: astronomerinc/ap-airflow:2.2.0-buster
+  environment:
+    &airflow-common-env
+    ASTRONOMER__AIRFLOW__WORKER_LOG_RETENTION_DAYS: 3
+    AIRFLOW_CONN_AIRFLOW_DB: postgresql://postgres:postgres@postgresql:5432/postgres?sslmode=disable
+  volumes:
+    - ./dags:/usr/local/airflow/dags
+    - ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
+    - logs:/usr/local/airflow/logs
+  user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-50000}"
+  depends_on:
+    redis:
+      condition: service_healthy
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+    restart: always
+
+  redis:
+    image: astronomerinc/ap-redis:0.11.0
+    entrypoint: [ "/bin/sh" ]
+    command: [ "-c", "redis-server --requirepass redis" ]
+    ports:
+      - 6379:6379
+    volumes:
+      - type: volume
+        source: redis-db
+        target: /data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 30s
+      retries: 50
+    restart: always
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: airflow webserver
+    ports:
+      - 8080:8080
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    restart: always
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: airflow scheduler
+    volumes:
+      - ./dags:/usr/local/airflow/dags
+      - ./config/airflow.cfg:/usr/local/airflow/airflow.cfg
+      - ./healthcheck:/usr/local/airflow/script
+      - logs:/usr/local/airflow/logs
+    healthcheck:
+      test: ["CMD-SHELL", "python /usr/local/airflow/script/scheduler-healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+    restart: always
+
+  airflow-worker:
+    <<: *airflow-common
+    command: ["sh", "-c", "airflow db check-migrations && airflow celery worker"]
+    environment:
+      <<: *airflow-common-env
+      AIRFLOW_ENVIRONMENT: LOCAL
+      C_FORCE_ROOT: 'true'
+    restart: always
+
+  airflow-init:
+    <<: *airflow-common
+    command: airflow db init
+
+  airflow-create-user:
+    <<: *airflow-common
+    command: airflow users create -r Admin -u admin -e admin@example.com -f admin -l user -p admin
+    restart: on-failure
+
+  flower:
+    <<: *airflow-common
+    command: airflow celery flower
+    ports:
+      - 5555:5555
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:5555/"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    restart: always
+
+volumes:
+  redis-db:
+  postgres-db-volume:
+  logs:
