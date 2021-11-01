@@ -8,14 +8,10 @@ from airflow.contrib.operators.bigquery_check_operator import BigQueryCheckOpera
 
 
 # Config variables
-# dag_config = Variable.get("bigquery_github_trends_variables", deserialize_json=True)
-# BQ_CONN_ID = dag_config["bq_conn_id"]
-# BQ_PROJECT = dag_config["bq_project"]
-# BQ_DATASET = dag_config["bq_dataset"]
-
-BQ_CONN_ID = "my_gcp_conn"
-BQ_PROJECT = "apply-ds-test-330707"
-BQ_DATASET = "github_trends"
+dag_config = Variable.get("bigquery_github_trends_variables", deserialize_json=True)
+BQ_CONN_ID = dag_config["bq_conn_id"]
+BQ_PROJECT = dag_config["bq_project"]
+BQ_DATASET = dag_config["bq_dataset"]
 
 default_args = {
     'owner': 'airflow',

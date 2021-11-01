@@ -1,7 +1,7 @@
 {
 	"bigquery_github_trends_variables": {
 		"bq_conn_id": "my_gcp_conn",
-		"bq_project": "apply-ds-test",
+		"bq_project": "apply-ds-test-330707",
 		"bq_dataset": "github_trends"
 	}
 }

@@ -51,7 +51,8 @@ services:
 
   airflow-webserver:
     <<: *airflow-common
-    command: airflow webserver
+    command: ["sh", "-c", "airflow webserver && airflow variables import /usr/local/airflow/dags/bigquery_github/config/variables.json"]
+    # command: airflow webserver
     ports:
       - 8080:8080
     healthcheck:
